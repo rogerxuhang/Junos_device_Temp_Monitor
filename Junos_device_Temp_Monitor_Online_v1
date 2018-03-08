@@ -1,0 +1,289 @@
+#!/usr/bin/python3
+#-*- coding:UTF-8 -*-
+
+import telnetlib
+import time
+import re
+import threading
+import smtplib
+import email.mime.multipart
+import email.mime.text
+
+
+def show_result_log_filename(Port):
+    show_chassis_environment_filename = r"./"+str(Port)+r"_Temp.txt"
+    return show_chassis_environment_filename
+
+def device_halt_log_filename(Port):
+    device_halt_log_filepath = r"./"+str(Port)+r"_Log.txt"
+    return device_halt_log_filepath
+
+def Console_Server_Login(HOST, Port, Username, Password):
+    try:
+        tn_1 = telnetlib.Telnet(HOST,Port)    # Login to Console server
+        tn_1.set_debuglevel(2)
+        Console_Server_Login_Result = tn_1.read_until(b'Login : ', 1)
+        time.sleep(5) # 20180304 21:45
+        if re.search('Closing', str(Console_Server_Login_Result)):
+            print("Port is in use!!!!!!")
+            tn_1.close()
+            time.sleep(3600)
+            Console_Server_Login(HOST, Port, Username, Password)
+        else:
+            time.sleep(1) #2018030421:54
+            tn_1.write(Username.encode('utf-8') + b"\n")
+            tn_1.read_until(b'Password : ')
+            tn_1.write(Password.encode('utf-8') + b"\n")
+            #tn_1.write(b'\n')
+            tn_1.read_until(b"root")   # Login as 'root' account, key word 'root' will display from the window
+            #tn_1.write(b"\n")
+            #tn_1.write(b'\x03')   # Input 'ctrl+c' to interrupt the ping testing it there has
+            tn_1.write(b"\n")
+            Device_Login_Result = tn_1.read_until(b'login:', 3)   # Device status is "login:)
+            time.sleep(3)  # 20180228 15:51 added
+            if "login" in str(Device_Login_Result):
+                tn_1.write(Username.encode('utf-8')+b'\n')
+                tn_1.read_until(b'Password', 1)
+                tn_1.write(Password.encode('utf-8')+b'\n')
+                time.sleep(2)  # Added 201803011334
+                tn_1.write(b'\n')
+                tn_1.write(b'\x03')
+                tn_1.write(b'cli -c \"show chassis environment | no-more\"'+b'\n')
+                time.sleep(3)
+                result_1 = tn_1.read_very_eager()
+                print(tn_1.read_very_eager().decode('ascii'))
+                file_object = open(show_result_log_filename(Port), 'wb+')
+                file_object.write(result_1)    # Storage the show output result
+                file_object.close()
+                time.sleep(3)
+                file_object = open(show_result_log_filename(Port), 'r+')
+                for line in file_object.readlines():
+                    print(line)
+                    if 'high' in line:
+                        tn_1.write(b'cli -c \"request system halt\"' + b'\n')
+                        send_email(Port)
+                        Device_Halt_Record(Port)
+                        tn_1.close()
+                        time.sleep(3600)
+                        Console_Server_Login(HOST, Port, Username, Password)
+                    else:
+                        print("Not find")
+                        # tn_1.close()
+                        # time.sleep(1800)
+                file_object.close()
+                tn_1.write(b'\n')
+                try:
+                    tn_1.read_until(b'%')
+                    tn_1.close()
+                    time.sleep(3600)
+                    Console_Server_Login(HOST, Port, Username, Password)
+                except:
+                    tn_1.close()
+                    time.sleep(60)
+                    Console_Server_Login(HOST, Port, Username, Password)
+            elif re.search('loader', str(Device_Login_Result)):
+                tn_1.write(b'reboot'+b'\n')
+                time.sleep(300)
+                tn_1.read_until(b'login:', 3)
+                tn_1.write(Username.encode('utf-8') + b'\n')
+                tn_1.read_until(b'Password', 1)
+                tn_1.write(Password.encode('utf-8') + b'\n')
+                time.sleep(2)  # Added 201803011334
+                tn_1.write(b'\n')
+                tn_1.write(b'cli -c \"show chassis environment | no-more\"' + b'\n')
+                time.sleep(3)
+                result_1 = tn_1.read_very_eager()
+                print(tn_1.read_very_eager().decode('ascii'))
+                file_object = open(show_result_log_filename(Port), 'wb+')
+                file_object.write(result_1)  # Storage the show output result
+                file_object.close()
+                time.sleep(3)
+                file_object = open(show_result_log_filename(Port), 'r+')
+                for line in file_object.readlines():
+                    print(line)
+                    if 'high' in line:
+                        tn_1.write(b'cli -c \"request system halt\"' + b'\n')
+                        send_email(Port)
+                        Device_Halt_Record(Port)
+                        tn_1.close()
+                        time.sleep(3600)
+                        Console_Server_Login(HOST, Port, Username, Password)
+                    else:
+                        print("Not find")
+                        # tn_1.close()
+                        # time.sleep(1800)
+                file_object.close()
+                tn_1.write(b'\n')
+                try:
+                    tn_1.read_until(b'%')
+                    tn_1.close()
+                    time.sleep(1800)
+                    Console_Server_Login(HOST, Port, Username, Password)
+                except:
+                    tn_1.close()
+                    time.sleep(60)
+                    Console_Server_Login(HOST, Port, Username, Password)
+            elif re.search('root(.*)>', str(Device_Login_Result)):
+                time.sleep(1) # Added 201803011444 try to collect show result better
+                tn_1.write(b'\n')
+                tn_1.write(b'show chassis environment | no-more\n')
+                time.sleep(3)
+                result_2 = tn_1.read_very_eager()
+                print(tn_1.read_very_eager().decode('ascii'))
+                file_object = open(show_result_log_filename(Port),'wb+')
+                file_object.write(result_2)
+                file_object.close()
+                time.sleep(3)
+                file_object = open(show_result_log_filename(Port), 'r+')
+                for line in file_object.readlines():
+                    print(line)
+                    if 'high' in line:
+                        tn_1.write(b'request system halt' + b'\n')
+                        tn_1.read_until(b'yes,')
+                        tn_1.write(b'yes' + b'\n')
+                        send_email(Port)
+                        Device_Halt_Record(Port)
+                        tn_1.close()
+                        time.sleep(3600)
+                        Console_Server_Login(HOST, Port, Username, Password)
+                    else:
+                        print("Not find")
+                        # tn_1.close()
+                        # time.sleep(1800)
+                file_object.close()
+                tn_1.write(b'\n')
+                try:
+                    tn_1.read_until(b'>')
+                    tn_1.close()
+                    time.sleep(1800)
+                    Console_Server_Login(HOST, Port, Username, Password)
+                except:
+                    tn_1.close()
+                    time.sleep(60)
+                    Console_Server_Login(HOST, Port, Username, Password)
+            elif re.search('root(.*)%', str(Device_Login_Result)):
+                time.sleep(1) # Added 201803011443 try to storage show result better
+                tn_1.write(b'\n')
+                tn_1.write(b"cli -c \"show chassis environment | no-more\""+b'\n')
+                time.sleep(3)
+                result_3=tn_1.read_very_eager()
+                print(result_3.decode('ascii'))
+                file_object = open(show_result_log_filename(Port),'wb+')
+                file_object.write(result_3)
+                file_object.close()
+                time.sleep(3)
+                file_object = open(show_result_log_filename(Port), 'r+')
+                for line in file_object.readlines():
+                    print(line)
+                    if 'high' in line:
+                        tn_1.write(b'cli -c \"request system halt\"' + b'\n')
+                        send_email(Port)
+                        Device_Halt_Record(Port)
+                        tn_1.close()
+                        time.sleep(3600)
+                        Console_Server_Login(HOST, Port, Username, Password)
+                    else:
+                        print("Not find")
+                        #tn_1.close()
+                        #time.sleep(1800)
+                file_object.close()
+                tn_1.write(b'\n')
+                try:
+                    tn_1.read_until(b'%')
+                    tn_1.close()
+                    time.sleep(1800)
+                    Console_Server_Login(HOST, Port, Username, Password)
+                except:
+                    tn_1.close()
+                    time.sleep(60)
+                    Console_Server_Login(HOST, Port, Username, Password)
+            elif re.search('root(.*)#', str(Device_Login_Result)):
+                time.sleep(1) # Added 201803011445 try to storage the show result better
+                tn_1.write(b'\n')
+                tn_1.write(b'run show chassis environment | no-more\n')
+                time.sleep(3)
+                result_4 = tn_1.read_very_eager()
+                file_object = open(show_result_log_filename(Port), 'wb+')
+                file_object.write(result_4)
+                file_object.close()
+                time.sleep(3)  # Added 201803011122 to leave more time to storage file
+                file_object = open(show_result_log_filename(Port), 'r+')
+                for line in file_object.readlines():
+                    print(line)
+                    if 'high' in line:
+                        tn_1.write(b'run request system halt' + b'\n')
+                        tn_1.read_until(b'yes,')
+                        tn_1.write(b'yes' + b'\n')
+                        send_email(Port)
+                        Device_Halt_Record(Port)
+                        tn_1.close()
+                        time.sleep(3600)
+                        Console_Server_Login(HOST, Port, Username, Password)
+                    else:
+                        print("Not find")
+                        # tn_1.close()
+                        # time.sleep(1800)
+                file_object.close()
+                tn_1.write(b'\n')
+                try:
+                    tn_1.read_until(b'#')
+                    tn_1.close()
+                    time.sleep(1800)
+                    Console_Server_Login(HOST, Port, Username, Password)
+                except:
+                    tn_1.close()
+                    time.sleep(60)
+                    Console_Server_Login(HOST, Port, Username, Password)
+            else:
+                print("Console cable disconneted or device in booting process")
+                tn_1.close()
+                time.sleep(50400)
+                Console_Server_Login(HOST, Port, Username, Password)
+    except:
+        print("!!!!!!!!!!!!!!!!!Abnormal but please wait!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        tn_1.close()
+        time.sleep(60)
+        Console_Server_Login(HOST, Port, Username, Password)
+
+def Device_Halt_Record(Port):
+    device_halt_log_create = open(device_halt_log_filename(Port), 'a+')
+    log_content = "{} device port {} is halted as high temp". format(time.asctime(), Port)+'\n'
+    device_halt_log_create.write(log_content)
+    device_halt_log_create.close()
+
+def send_email(Port):
+    """
+    发送邮件
+    :param SMTP_host: smtp.163.com
+    :param from_addr: 发送地址：xxx@163.com
+    :param password: 密码: password
+    :param to_addrs: 发送给谁的邮箱： xxx@qq.com
+    :param subject:  邮件主题： test
+    :param content:  邮件内容： test
+    :return: None
+    """
+    msg = email.mime.multipart.MIMEMultipart()
+    from_addr = 'XXXXXX@126.com'
+    to_addrs = 'XXXXXXX@126.com,XXXXXX@juniper.net'
+    msg['from'] = 'XXXXXX@126.com'
+    msg['to'] = 'XXXXXXXX@126.com,XXXXXXXX@juniper.net'
+    msg['subject'] = "CSS LAB Console Server " + "10.75.252.1: " + "Device with port " + str(Port) +" is halted as high Temp!!!"
+    content= "Device with " + str(Port) +" is halted as high Temp!!!"
+    txt = email.mime.text.MIMEText(content)
+    msg.attach(txt)
+
+    smtp = smtplib.SMTP()
+    smtp.connect('smtp.126.com', '25')
+    smtp.login('XXXXXX@126.com', 'XXXXXX')
+    smtp.sendmail(from_addr, to_addrs.split(','), str(msg))
+    smtp.quit()
+
+if __name__ == '__main__':
+    HOST = "10.X.X.X"
+    port = [7001,7002,7003,7004,7005,7006,7007,7008,7009,7016,7018,7019,7021,7020,7022,7024]
+#port = [7001]
+    Username = 'XXXX'
+    Password = 'XXXXXX'
+    for Port in port:
+        t = threading.Thread(target=Console_Server_Login,args=(HOST,Port,Username,Password))
+        t.start()
