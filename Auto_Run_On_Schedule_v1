@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+#-*- coding:UTF-8 -*-
+
+import time
+import os
+
+while True:
+    if  time.localtime(time.time()).tm_hour==5 and  time.localtime(time.time()).tm_min==50 and  time.localtime(time.time()).tm_sec==0:
+        print(time.localtime(time.time()).tm_hour)
+        os.system('nohup python -u CSS_LAB_AUTO_Wake_UP_v1.py > Output_Auto_Wakeup.out 2>&1 &')
+    elif  time.localtime(time.time()).tm_hour==6 and  time.localtime(time.time()).tm_min==0 and  time.localtime(time.time()).tm_sec==0:
+        print(time.localtime(time.time()).tm_hour)
+        os.system('nohup python -u CSS_LAB_Temp_Monitor_v4.py > Output_Auto_Temp_Monitor.out 2>&1 &')
+    elif time.localtime(time.time()).tm_hour==9 and  time.localtime(time.time()).tm_min==35 and  time.localtime(time.time()).tm_sec==0:
+        os.system('rm -f ./Output_Auto_Temp_Monitor.out > Delete_Temp_Monitor_result.out 2>&1 &')
+        os.system('rm -f ./Output_Auto_Wakeup.out > Delete_Wakeup_result.out 2>&1 &')
+        os.system('rm -f ./Output_Auto_Storage_cleanup.out > Delete_Storage_cleanup.out 2>&1 &')
+        os.system('rm -f ./Output_Auto_Rescue_load.out > Delete_Rescue_load.out 2>&1 &')
+    elif time.localtime(time.time()).tm_hour==21 and  time.localtime(time.time()).tm_min==0 and  time.localtime(time.time()).tm_sec==0:
+        os.system('nohup sh get_kill_Temp_pid.sh')
+    elif time.localtime(time.time()).tm_hour==21 and  time.localtime(time.time()).tm_min==10 and  time.localtime(time.time()).tm_sec==0:
+        os.system('nohup python -u CSS_LAB_AUTO_Storage_Cleanup.py > Output_Auto_Storage_cleanup.out 2>&1 &')
+    elif time.localtime(time.time()).tm_hour==21 and  time.localtime(time.time()).tm_min==20 and  time.localtime(time.time()).tm_sec==0:
+        os.system('nohup python -u CSS_LAB_AUTO_Rescue_Load_v2.py > Output_Auto_Rescue_load.out 2>&1 &')
+    else:
+        pass
