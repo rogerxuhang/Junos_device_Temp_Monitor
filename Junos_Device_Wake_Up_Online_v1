@@ -1,0 +1,55 @@
+#!/usr/bin/python3
+#-*- coding:UTF-8 -*-
+
+import telnetlib
+import time
+import re
+import threading
+
+def Device_Rescue_Config(Port):
+    Device_Rescue_Config_filename = r"H:/Pycharm_project/"+str(Port)+r"_Config.txt"
+    return Device_Rescue_Config_filename
+
+def Console_Server_Login(HOST, Port, Username, Password):
+    try:
+        tn_1 = telnetlib.Telnet(HOST,Port)    # Login to Console server
+        tn_1.set_debuglevel(2)
+        Console_Server_Login_Result = tn_1.read_until(b'Login : ', 1)
+        time.sleep(5) # 20180304 21:45
+        if re.search('Closing', str(Console_Server_Login_Result)):
+            print("Port is in use!!!!!!")
+            tn_1.close()
+            #time.sleep(60)
+            #Console_Server_Login(HOST, Port, Username, Password)
+        else:
+            tn_1.write(Username.encode('utf-8') + b"\n")
+            time.sleep(3)
+            tn_1.read_until(b'Password : ')
+            time.sleep(3)
+            tn_1.write(Password.encode('utf-8') + b"\n")
+            time.sleep(5)
+            #tn_1.write(b'\n').
+            tn_1.read_until(b"root",2)   # Login as 'root' account, key word 'root' will display from the window
+            tn_1.write(b'\n')
+            time.sleep(2)
+            tn_1.write(b'\n')
+            time.sleep(5)
+            #tn_1.read_until(b'rebooting',2)
+            tn_1.write(b"\n")
+            time.sleep(2)
+            tn_1.close()
+
+    except:
+        print("!!!!!!!!!!!!!!!!!Abnormal but please wait!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        tn_1.close()
+        time.sleep(60)
+        Console_Server_Login(HOST, Port, Username, Password)
+
+if __name__ == '__main__':
+    HOST = "10.x.x.x"
+    Username = 'root'
+    Password = 'xxxx'
+    for Port in port:
+        t = threading.Thread(target=Console_Server_Login,args=(HOST,Port,Username,Password))
+        t.start()
+        t.join()
